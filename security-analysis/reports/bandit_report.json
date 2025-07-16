@@ -1,0 +1,429 @@
+{
+  "errors": [],
+  "generated_at": "2025-07-10T09:36:28Z",
+  "metrics": {
+    "/Users/anushka/Desktop/DIDAuth-IoT/security-analysis/../did-api-gateway/did_vc_api.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 2,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 2,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 466,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "/Users/anushka/Desktop/DIDAuth-IoT/security-analysis/../did-api-gateway/tests/test_verify_vp.py": {
+      "CONFIDENCE.HIGH": 1,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 1,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 53,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "/Users/anushka/Desktop/DIDAuth-IoT/security-analysis/../did-api-vendor/backend/main.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 2,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 2,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 237,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "/Users/anushka/Desktop/DIDAuth-IoT/security-analysis/../did-api-vendor/backend/vc_utils.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 3,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 3,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 199,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "/Users/anushka/Desktop/DIDAuth-IoT/security-analysis/../did-api-vendor/tests/test_revocation.py": {
+      "CONFIDENCE.HIGH": 2,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 2,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 59,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "/Users/anushka/Desktop/DIDAuth-IoT/security-analysis/../did-api-vendor/tests/test_vc_utils.py": {
+      "CONFIDENCE.HIGH": 6,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 6,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 65,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "_totals": {
+      "CONFIDENCE.HIGH": 9,
+      "CONFIDENCE.LOW": 7,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 9,
+      "SEVERITY.MEDIUM": 7,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 1079,
+      "nosec": 0,
+      "skipped_tests": 0
+    }
+  },
+  "results": [
+    {
+      "code": "461     try:\n462         response = requests.get(f\"{IPFS_API_URL}/ipfs/{cid}\")\n463         response.raise_for_status()\n",
+      "col_offset": 19,
+      "end_col_offset": 61,
+      "filename": "/Users/anushka/Desktop/DIDAuth-IoT/security-analysis/../did-api-gateway/did_vc_api.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 400,
+        "link": "https://cwe.mitre.org/data/definitions/400.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Call to requests without timeout",
+      "line_number": 462,
+      "line_range": [
+        462
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b113_request_without_timeout.html",
+      "test_id": "B113",
+      "test_name": "request_without_timeout"
+    },
+    {
+      "code": "485                 cid_from_chain = contract.functions.getDIDCID(did_full).call()\n486                 did_response = requests.get(f\"{IPFS_API_URL}/ipfs/{cid_from_chain}\")\n487                 did_response.raise_for_status()\n",
+      "col_offset": 31,
+      "end_col_offset": 84,
+      "filename": "/Users/anushka/Desktop/DIDAuth-IoT/security-analysis/../did-api-gateway/did_vc_api.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 400,
+        "link": "https://cwe.mitre.org/data/definitions/400.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Call to requests without timeout",
+      "line_number": 486,
+      "line_range": [
+        486
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b113_request_without_timeout.html",
+      "test_id": "B113",
+      "test_name": "request_without_timeout"
+    },
+    {
+      "code": "59     result = asyncio.run(did_vc_api.verify_vp(req))\n60     assert result[\"firmware_hash_match\"] is False\n",
+      "col_offset": 4,
+      "end_col_offset": 49,
+      "filename": "/Users/anushka/Desktop/DIDAuth-IoT/security-analysis/../did-api-gateway/tests/test_verify_vp.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 60,
+      "line_range": [
+        60
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "121     with open(did_path, \"rb\") as f:\n122         res = requests.post(f\"{IPFS_API_URL}/add\", files={\"file\": f})\n123     if res.status_code != 200:\n",
+      "col_offset": 14,
+      "end_col_offset": 69,
+      "filename": "/Users/anushka/Desktop/DIDAuth-IoT/security-analysis/../did-api-vendor/backend/main.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 400,
+        "link": "https://cwe.mitre.org/data/definitions/400.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Call to requests without timeout",
+      "line_number": 122,
+      "line_range": [
+        122
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b113_request_without_timeout.html",
+      "test_id": "B113",
+      "test_name": "request_without_timeout"
+    },
+    {
+      "code": "160     cid = contract.functions.getDIDCID(did).call()\n161     response = requests.post(f\"{IPFS_API_URL}/cat?arg={cid}\")\n162     if response.status_code == 200:\n",
+      "col_offset": 15,
+      "end_col_offset": 61,
+      "filename": "/Users/anushka/Desktop/DIDAuth-IoT/security-analysis/../did-api-vendor/backend/main.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 400,
+        "link": "https://cwe.mitre.org/data/definitions/400.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Call to requests without timeout",
+      "line_number": 161,
+      "line_range": [
+        161
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b113_request_without_timeout.html",
+      "test_id": "B113",
+      "test_name": "request_without_timeout"
+    },
+    {
+      "code": "92     files = {'file': ('vc.json', json_str)}\n93     res = requests.post(f\"{IPFS_API_URL}/add\", files=files)\n94     if res.status_code != 200:\n",
+      "col_offset": 10,
+      "end_col_offset": 59,
+      "filename": "/Users/anushka/Desktop/DIDAuth-IoT/security-analysis/../did-api-vendor/backend/vc_utils.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 400,
+        "link": "https://cwe.mitre.org/data/definitions/400.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Call to requests without timeout",
+      "line_number": 93,
+      "line_range": [
+        93
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b113_request_without_timeout.html",
+      "test_id": "B113",
+      "test_name": "request_without_timeout"
+    },
+    {
+      "code": "100     files = {\"file\": (\"firmware.bin\", data)}\n101     res = requests.post(f\"{IPFS_API_URL}/add\", files=files)\n102     if res.status_code != 200:\n",
+      "col_offset": 10,
+      "end_col_offset": 59,
+      "filename": "/Users/anushka/Desktop/DIDAuth-IoT/security-analysis/../did-api-vendor/backend/vc_utils.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 400,
+        "link": "https://cwe.mitre.org/data/definitions/400.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Call to requests without timeout",
+      "line_number": 101,
+      "line_range": [
+        101
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b113_request_without_timeout.html",
+      "test_id": "B113",
+      "test_name": "request_without_timeout"
+    },
+    {
+      "code": "106 def ipfs_download(cid: str):\n107     res = requests.post(f\"{IPFS_API_URL}/cat?arg={cid}\")\n108     if res.status_code != 200:\n",
+      "col_offset": 10,
+      "end_col_offset": 56,
+      "filename": "/Users/anushka/Desktop/DIDAuth-IoT/security-analysis/../did-api-vendor/backend/vc_utils.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 400,
+        "link": "https://cwe.mitre.org/data/definitions/400.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Call to requests without timeout",
+      "line_number": 107,
+      "line_range": [
+        107
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b113_request_without_timeout.html",
+      "test_id": "B113",
+      "test_name": "request_without_timeout"
+    },
+    {
+      "code": "56         result = vc_utils.verify_vc(vc, DummyContractNotRevoked())\n57     assert result == {\n58         \"valid\": True,\n59         \"issuer\": \"did:local:test\",\n60         \"revoked\": False,\n61         \"status\": \"\u2705 Signature valid\",\n62     }\n63 \n",
+      "col_offset": 4,
+      "end_col_offset": 5,
+      "filename": "/Users/anushka/Desktop/DIDAuth-IoT/security-analysis/../did-api-vendor/tests/test_revocation.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 57,
+      "line_range": [
+        57,
+        58,
+        59,
+        60,
+        61,
+        62
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "68         result = vc_utils.verify_vc(vc, DummyContractRevoked())\n69     assert result == {\n70         \"valid\": False,\n71         \"issuer\": \"did:local:test\",\n72         \"revoked\": True,\n73         \"status\": \"\u274c Revoked\",\n74     }\n",
+      "col_offset": 4,
+      "end_col_offset": 5,
+      "filename": "/Users/anushka/Desktop/DIDAuth-IoT/security-analysis/../did-api-vendor/tests/test_revocation.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 69,
+      "line_range": [
+        69,
+        70,
+        71,
+        72,
+        73,
+        74
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "27     result = vc_utils.verify_vc(vc, DummyContract())\n28     assert result == {\"valid\": False, \"error\": \"contractAddress missing\"}\n29 \n",
+      "col_offset": 4,
+      "end_col_offset": 73,
+      "filename": "/Users/anushka/Desktop/DIDAuth-IoT/security-analysis/../did-api-vendor/tests/test_vc_utils.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 28,
+      "line_range": [
+        28
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "49 \n50     assert tx == \"0xhash\"\n51     mock_w3.eth.send_raw_transaction.assert_called_once_with(signed.raw_transaction)\n",
+      "col_offset": 4,
+      "end_col_offset": 25,
+      "filename": "/Users/anushka/Desktop/DIDAuth-IoT/security-analysis/../did-api-vendor/tests/test_vc_utils.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 50,
+      "line_range": [
+        50
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "79 \n80     assert res[\"firmware_cid\"] == \"fwcid\"\n81     assert res[\"ipfs_cid\"] == \"vccid\"\n",
+      "col_offset": 4,
+      "end_col_offset": 41,
+      "filename": "/Users/anushka/Desktop/DIDAuth-IoT/security-analysis/../did-api-vendor/tests/test_vc_utils.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 80,
+      "line_range": [
+        80
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "80     assert res[\"firmware_cid\"] == \"fwcid\"\n81     assert res[\"ipfs_cid\"] == \"vccid\"\n82     assert res[\"vc\"][\"firmwareCid\"] == \"fwcid\"\n",
+      "col_offset": 4,
+      "end_col_offset": 37,
+      "filename": "/Users/anushka/Desktop/DIDAuth-IoT/security-analysis/../did-api-vendor/tests/test_vc_utils.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 81,
+      "line_range": [
+        81
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "81     assert res[\"ipfs_cid\"] == \"vccid\"\n82     assert res[\"vc\"][\"firmwareCid\"] == \"fwcid\"\n83     assert len(calls) == 2\n",
+      "col_offset": 4,
+      "end_col_offset": 46,
+      "filename": "/Users/anushka/Desktop/DIDAuth-IoT/security-analysis/../did-api-vendor/tests/test_vc_utils.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 82,
+      "line_range": [
+        82
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    },
+    {
+      "code": "82     assert res[\"vc\"][\"firmwareCid\"] == \"fwcid\"\n83     assert len(calls) == 2\n84 \n",
+      "col_offset": 4,
+      "end_col_offset": 26,
+      "filename": "/Users/anushka/Desktop/DIDAuth-IoT/security-analysis/../did-api-vendor/tests/test_vc_utils.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "line_number": 83,
+      "line_range": [
+        83
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b101_assert_used.html",
+      "test_id": "B101",
+      "test_name": "assert_used"
+    }
+  ]
+}

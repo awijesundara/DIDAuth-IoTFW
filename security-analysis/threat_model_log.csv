@@ -1,0 +1,16 @@
+timestamp,iteration,scenario,result,latency,http_code,status
+2025-07-16 10:33,1,credential_forgery,success,0.581467,200,❌ Failed to fetch DID: 400: DID not found: did:local:attacker
+2025-07-16 10:33,1,replay_attack,failure,5.69299,200,❌ VC is revoked
+2025-07-16 10:33,1,gateway_compromise,success,0.585963,200,❌ Failed to fetch DID: 'proof'
+2025-07-16 10:33,2,credential_forgery,success,0.702466,200,❌ Failed to fetch DID: 400: DID not found: did:local:attacker
+2025-07-16 10:33,2,replay_attack,failure,5.68064,200,❌ VC is revoked
+2025-07-16 10:33,2,gateway_compromise,success,0.253208,200,❌ Failed to fetch DID: 'proof'
+2025-07-16 10:33,3,credential_forgery,success,0.584913,200,❌ Failed to fetch DID: 400: DID not found: did:local:attacker
+2025-07-16 10:33,3,replay_attack,failure,5.778553,200,❌ VC is revoked
+2025-07-16 10:33,3,gateway_compromise,success,0.242992,200,❌ Failed to fetch DID: 'proof'
+2025-07-16 10:33,4,credential_forgery,success,0.62413,200,❌ Failed to fetch DID: 400: DID not found: did:local:attacker
+2025-07-16 10:33,4,replay_attack,failure,5.68267,200,❌ VC is revoked
+2025-07-16 10:33,4,gateway_compromise,success,0.610074,200,❌ Failed to fetch DID: 'proof'
+2025-07-16 10:34,5,credential_forgery,success,0.602745,200,❌ Failed to fetch DID: 400: DID not found: did:local:attacker
+2025-07-16 10:34,5,replay_attack,failure,5.684481,200,❌ VC is revoked
+2025-07-16 10:34,5,gateway_compromise,success,0.719685,200,❌ Failed to fetch DID: 'proof'
