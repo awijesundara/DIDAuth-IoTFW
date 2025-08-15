@@ -345,14 +345,18 @@ async def verify_vp(request: Request, require_secure_element: bool = False):
                     raise HTTPException(status_code=400, detail=f"DID not found: {did_full}")
                 url = f"{IPFS_API_URL}/ipfs/{cid}"
                 async with httpx.AsyncClient() as client:
-                    resp = await client.get(url)
-                resp.raise_for_status()
+                    resp = await client.get(url, timeout=10)
+                    resp.raise_for_status()
                 did_doc = resp.json()
                 os.makedirs(os.path.dirname(did_path), exist_ok=True)
                 with open(did_path, "w") as f:
                     json.dump(did_doc, f, indent=2)
+            except httpx.HTTPError as e:
+                raise HTTPException(status_code=502, detail=f"Failed to fetch DID: {e}")
+            except HTTPException:
+                raise
             except Exception as e:
-                raise HTTPException(status_code=400, detail=f"Failed to fetch DID: {str(e)}")
+                raise HTTPException(status_code=502, detail=f"Failed to fetch DID: {e}")
         else:
             with open(did_path) as f:
                 did_doc = json.load(f)
@@ -397,14 +401,18 @@ async def verify_vp(request: Request, require_secure_element: bool = False):
                 raise HTTPException(status_code=400, detail=f"DID not found: {did_full}")
             url = f"{IPFS_API_URL}/ipfs/{cid}"
             async with httpx.AsyncClient() as client:
-                resp = await client.get(url)
-            resp.raise_for_status()
+                resp = await client.get(url, timeout=10)
+                resp.raise_for_status()
             did_doc = resp.json()
             os.makedirs(os.path.dirname(did_path), exist_ok=True)
             with open(did_path, "w") as f:
                 json.dump(did_doc, f, indent=2)
+        except httpx.HTTPError as e:
+            raise HTTPException(status_code=502, detail=f"Failed to fetch DID: {e}")
+        except HTTPException:
+            raise
         except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Failed to fetch DID: {str(e)}")
+            raise HTTPException(status_code=502, detail=f"Failed to fetch DID: {e}")
     else:
         with open(did_path) as f:
             did_doc = json.load(f)
@@ -476,12 +484,12 @@ async def verify_vp(request: Request, require_secure_element: bool = False):
     if firmware_cid and expected_hash:
         try:
             async with httpx.AsyncClient() as client:
-                resp = await client.get(f"{IPFS_API_URL}/ipfs/{firmware_cid}")
-            resp.raise_for_status()
+                resp = await client.get(f"{IPFS_API_URL}/ipfs/{firmware_cid}", timeout=10)
+                resp.raise_for_status()
             data = resp.content
             digest = hashlib.sha256(data).hexdigest()
             firmware_ok = digest == expected_hash
-        except Exception:
+        except httpx.HTTPError:
             firmware_ok = False
 
     status = (
@@ -507,11 +515,11 @@ async def verify_vp(request: Request, require_secure_element: bool = False):
 def verify_vc(req: VCVerifyRequest):
     cid = req.cid.strip()
     try:
-        response = requests.get(f"{IPFS_API_URL}/ipfs/{cid}")
+        response = requests.get(f"{IPFS_API_URL}/ipfs/{cid}", timeout=10)
         response.raise_for_status()
         vc = response.json()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"IPFS fetch error: {str(e)}")
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"IPFS fetch error: {e}")
 
     if "issuer" not in vc:
         raise HTTPException(status_code=400, detail="Missing issuer in VC")
@@ -534,7 +542,7 @@ def verify_vc(req: VCVerifyRequest):
                 if not cid_from_chain:
                     raise HTTPException(status_code=400, detail=f"DID not found: {did_full}")
                 url = f"{IPFS_API_URL}/ipfs/{cid_from_chain}"
-                did_response = requests.get(url)
+                did_response = requests.get(url, timeout=10)
                 did_response.raise_for_status()
                 did_doc = did_response.json()
                 os.makedirs(os.path.dirname(did_path), exist_ok=True)
@@ -542,8 +550,8 @@ def verify_vc(req: VCVerifyRequest):
                     json.dump(did_doc, f, indent=2)
             except HTTPException:
                 raise
-            except Exception as e:
-                raise HTTPException(status_code=400, detail=f"Failed to fetch DID: {str(e)}")
+            except requests.exceptions.RequestException as e:
+                raise HTTPException(status_code=502, detail=f"Failed to fetch DID: {e}")
 
     try:
         pubkey_pem = did_doc["verificationMethod"][0]["publicKeyPem"]

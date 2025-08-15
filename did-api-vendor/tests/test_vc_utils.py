@@ -2,6 +2,11 @@ import importlib.util
 from pathlib import Path
 from unittest.mock import MagicMock
 import base64
+import os
+import requests
+from cryptography.fernet import Fernet
+
+os.environ.setdefault("FERNET_SECRET", Fernet.generate_key().decode())
 
 spec = importlib.util.spec_from_file_location(
     "vc_utils", Path(__file__).resolve().parents[1] / "backend" / "vc_utils.py"
@@ -65,7 +70,10 @@ def test_issue_vc_uploads_firmware_and_embeds_cid(monkeypatch):
         def json(self):
             return {"Hash": self._cid}
 
-    def mock_post(url, files=None):
+        def raise_for_status(self):
+            pass
+
+    def mock_post(url, files=None, timeout=None):
         calls.append((url, files))
         if len(calls) == 1:
             return MockResp("fwcid")
@@ -75,7 +83,9 @@ def test_issue_vc_uploads_firmware_and_embeds_cid(monkeypatch):
         def sign(self, _):
             return b"sig"
 
-    monkeypatch.setattr(vc_utils, "requests", MagicMock(post=mock_post))
+    mock_requests = MagicMock(post=mock_post)
+    mock_requests.exceptions = requests.exceptions
+    monkeypatch.setattr(vc_utils, "requests", mock_requests)
     monkeypatch.setattr(vc_utils, "load_or_create_keys", lambda _: (DummyKey(), "pub"))
 
     res = vc_utils.issue_vc("test", "1.0", "ESP32", base64.b64encode(b"bin").decode())

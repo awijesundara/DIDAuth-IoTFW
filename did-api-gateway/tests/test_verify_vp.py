@@ -5,6 +5,10 @@ import importlib.util
 import hashlib
 from pathlib import Path
 import pytest
+import os
+
+# AES_KEY must be standard base64 so base64.b64decode works
+os.environ.setdefault("AES_KEY", base64.b64encode(os.urandom(32)).decode())
 
 spec = importlib.util.spec_from_file_location(
     "did_vc_api", Path(__file__).resolve().parents[1] / "did_vc_api.py"
@@ -45,7 +49,7 @@ def test_verify_vp_bad_firmware_hash(tmp_path, monkeypatch):
             return self
         async def __aexit__(self, exc_type, exc, tb):
             pass
-        async def get(self, url):
+        async def get(self, url, timeout=None):
             return Resp()
     monkeypatch.setattr(did_vc_api.httpx, "AsyncClient", Client)
 

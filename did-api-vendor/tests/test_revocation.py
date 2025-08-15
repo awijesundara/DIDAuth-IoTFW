@@ -1,6 +1,10 @@
 import importlib.util
 from pathlib import Path
 from unittest.mock import patch, MagicMock
+import os
+from cryptography.fernet import Fernet
+
+os.environ.setdefault("FERNET_SECRET", Fernet.generate_key().decode())
 
 spec = importlib.util.spec_from_file_location(
     "vc_utils", Path(__file__).resolve().parents[1] / "backend" / "vc_utils.py"
