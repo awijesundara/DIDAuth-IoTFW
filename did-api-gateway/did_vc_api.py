@@ -316,6 +316,9 @@ def create_vp(req: VPCreateRequest, x_api_key: str = Header(...)):
 async def verify_vp(request: Request):
 
     vp_json = await request.json()
+    disclosures = vp_json.get("disclosures")
+    if disclosures is None and isinstance(vp_json.get("vp"), dict):
+        disclosures = vp_json["vp"].get("disclosures")
 
     if "verifiableCredential" in vp_json:
         vp = vp_json
@@ -413,6 +416,30 @@ async def verify_vp(request: Request):
     except InvalidSignature:
         valid = False
 
+    disclosed_claims = {}
+    commitment_root = vc.get("commitmentRoot")
+    if commitment_root:
+        if not disclosures or not isinstance(disclosures, list):
+            raise HTTPException(status_code=400, detail="Missing disclosures")
+        for disc in disclosures:
+            claim = disc.get("claim")
+            salt = disc.get("salt")
+            proof = disc.get("merkleProof")
+            if not claim or not salt or not isinstance(proof, list):
+                raise HTTPException(status_code=400, detail="Invalid disclosure format")
+            if len(claim) != 1:
+                raise HTTPException(status_code=400, detail="Invalid claim in disclosure")
+            key, value = next(iter(claim.items()))
+            h = hashlib.sha256(f"{key}:{value}:{salt}".encode()).hexdigest()
+            for sib in proof:
+                a, b = sorted([h, sib])
+                h = hashlib.sha256((a + b).encode()).hexdigest()
+            if h != commitment_root:
+                raise HTTPException(status_code=400, detail=f"Invalid Merkle proof for {key}")
+            disclosed_claims[key] = value
+    elif disclosures:
+        raise HTTPException(status_code=400, detail="Disclosures provided but VC lacks commitmentRoot")
+
     chain_issuer = None
     if contract is not None:
         try:
@@ -437,7 +464,7 @@ async def verify_vp(request: Request):
 
     firmware_ok = False
     firmware_cid = vc.get("firmwareCid")
-    expected_hash = vc.get("credentialSubject", {}).get("firmwareHash")
+    expected_hash = disclosed_claims.get("firmwareHash")
     if firmware_cid and expected_hash:
         try:
             async with httpx.AsyncClient() as client:
