@@ -124,19 +124,47 @@ def issue_vc(did_name: str, firmware_version: str, device_model: str, firmware_b
 
     private_key, pubkey_pem = load_or_create_keys(did_name)
 
+    # Build salts and leaf hashes for each claim
+    claims = {
+        "firmwareVersion": firmware_version,
+        "firmwareHash": firmware_hash,
+        "deviceModel": device_model,
+    }
+    salts = {}
+    leaf_hashes = []
+    for k in sorted(claims.keys()):
+        salt = base64.urlsafe_b64encode(os.urandom(16)).decode()
+        salts[k] = salt
+        leaf = hashlib.sha256(f"{k}:{claims[k]}:{salt}".encode()).hexdigest()
+        leaf_hashes.append(leaf)
+
+    # Compute Merkle root
+    def merkle_root(leaves):
+        if not leaves:
+            return ""
+        lvl = leaves[:]
+        while len(lvl) > 1:
+            if len(lvl) % 2 == 1:
+                lvl.append(lvl[-1])
+            nxt = []
+            for i in range(0, len(lvl), 2):
+                a, b = sorted([lvl[i], lvl[i + 1]])
+                nxt.append(hashlib.sha256((a + b).encode()).hexdigest())
+            lvl = nxt
+        return lvl[0]
+
+    root = merkle_root(leaf_hashes)
+
     vc = {
         "@context": ["https://www.w3.org/ns/credentials/v2"],
         "type": ["VerifiableCredential", "FirmwareCredential"],
         "id": f"vc:{did_name}:{firmware_version}",
         "issuer": f"did:local:{did_name}",
         "issuanceDate": datetime.utcnow().isoformat() + "Z",
-        "credentialSubject": {
-            "firmwareVersion": firmware_version,
-            "firmwareHash": firmware_hash,
-            "deviceModel": device_model
-        },
+        "credentialSubject": {},
+        "commitmentRoot": root,
         "firmwareCid": firmware_cid,
-        "contractAddress": CONTRACT_ADDRESS
+        "contractAddress": CONTRACT_ADDRESS,
     }
 
     message = json.dumps(vc, separators=(",", ":"), sort_keys=True).encode()
@@ -157,6 +185,10 @@ def issue_vc(did_name: str, firmware_version: str, device_model: str, firmware_b
     os.makedirs(vc_dir, exist_ok=True)
     with open(os.path.join(vc_dir, "firmware_vc.json"), "w") as f:
         json.dump(vc, f, indent=2)
+    # Persist salts and claims for proof generation
+    proof_data = {"claims": claims, "salts": salts}
+    with open(os.path.join(vc_dir, "salts.json"), "w") as f:
+        json.dump(proof_data, f, indent=2)
 
     try:
         cid = ipfs_upload(vc)
@@ -168,6 +200,7 @@ def issue_vc(did_name: str, firmware_version: str, device_model: str, firmware_b
         "vc": vc,
         "ipfs_cid": cid,
         "firmware_cid": firmware_cid,
+        "proof_data": proof_data,
     }
 
 def verify_vc(vc: dict, contract):
