@@ -26,6 +26,20 @@ IPFS_API_URL = os.getenv("IPFS_API_URL", "http://127.0.0.1:5001/api/v0")
 
 fernet = Fernet(FERNET_SECRET)
 
+
+def enforce_permissions():
+    """Restrict sensitive files to user-only access on startup."""
+    for root, _, files in os.walk(DATA_DIR):
+        for name in files:
+            if name in {"private_key.pem", "public_key.pem", "apikey.key"}:
+                try:
+                    os.chmod(os.path.join(root, name), 0o600)
+                except OSError:
+                    pass
+
+
+enforce_permissions()
+
 def sanitize_name(name: str) -> str:
     if not re.match(r"^[A-Za-z0-9_-]+$", name):
         raise HTTPException(status_code=400, detail="Invalid name")
@@ -56,6 +70,12 @@ def load_or_create_keys(did_name: str):
     else:
         with open(priv_path, "rb") as f:
             private_key = serialization.load_pem_private_key(f.read(), password=None)
+    # enforce owner-only permissions (0o600) for key files
+    for path in (priv_path, pub_path):
+        try:
+            os.chmod(path, 0o600)
+        except OSError:
+            pass
 
     with open(pub_path, "r") as f:
         pubkey_pem = f.read()
@@ -71,6 +91,11 @@ def save_api_key(did_name: str):
     os.makedirs(os.path.dirname(apikey_path), exist_ok=True)
     with open(apikey_path, "w") as f:
         f.write(encrypted)
+
+    try:
+        os.chmod(apikey_path, 0o600)
+    except OSError:
+        pass  # best effort to lock down API key file
 
     return api_key
 
@@ -90,23 +115,29 @@ def verify_api_key(did_name: str, api_key: str):
 def ipfs_upload(json_obj):
     json_str = json.dumps(json_obj)
     files = {'file': ('vc.json', json_str)}
-    res = requests.post(f"{IPFS_API_URL}/add", files=files)
-    if res.status_code != 200:
-        raise RuntimeError(f"IPFS upload failed: {res.text}")
+    try:
+        res = requests.post(f"{IPFS_API_URL}/add", files=files, timeout=10)
+        res.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"IPFS upload failed: {e}")
     return res.json().get("Hash")
 
 
 def ipfs_upload_bytes(data: bytes) -> str:
     files = {"file": ("firmware.bin", data)}
-    res = requests.post(f"{IPFS_API_URL}/add", files=files)
-    if res.status_code != 200:
-        raise RuntimeError(f"IPFS upload failed: {res.text}")
+    try:
+        res = requests.post(f"{IPFS_API_URL}/add", files=files, timeout=10)
+        res.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"IPFS upload failed: {e}")
     return res.json().get("Hash")
 
 def ipfs_download(cid: str):
-    res = requests.post(f"{IPFS_API_URL}/cat?arg={cid}")
-    if res.status_code != 200:
-        raise RuntimeError(f"IPFS download failed: {res.text}")
+    try:
+        res = requests.post(f"{IPFS_API_URL}/cat?arg={cid}", timeout=10)
+        res.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"IPFS download failed: {e}")
     return json.loads(res.content)
 
 def issue_vc(did_name: str, firmware_version: str, device_model: str, firmware_b64: str):
@@ -117,12 +148,40 @@ def issue_vc(did_name: str, firmware_version: str, device_model: str, firmware_b
         raise HTTPException(status_code=400, detail="Invalid base64 data")
     firmware_hash = hashlib.sha256(firmware_bytes).hexdigest()
 
-    try:
-        firmware_cid = ipfs_upload_bytes(firmware_bytes)
-    except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    firmware_cid = ipfs_upload_bytes(firmware_bytes)
 
     private_key, pubkey_pem = load_or_create_keys(did_name)
+
+    # Build salts and leaf hashes for each claim
+    claims = {
+        "firmwareVersion": firmware_version,
+        "firmwareHash": firmware_hash,
+        "deviceModel": device_model,
+    }
+    salts = {}
+    leaf_hashes = []
+    for k in sorted(claims.keys()):
+        salt = base64.urlsafe_b64encode(os.urandom(16)).decode()
+        salts[k] = salt
+        leaf = hashlib.sha256(f"{k}:{claims[k]}:{salt}".encode()).hexdigest()
+        leaf_hashes.append(leaf)
+
+    # Compute Merkle root
+    def merkle_root(leaves):
+        if not leaves:
+            return ""
+        lvl = leaves[:]
+        while len(lvl) > 1:
+            if len(lvl) % 2 == 1:
+                lvl.append(lvl[-1])
+            nxt = []
+            for i in range(0, len(lvl), 2):
+                a, b = sorted([lvl[i], lvl[i + 1]])
+                nxt.append(hashlib.sha256((a + b).encode()).hexdigest())
+            lvl = nxt
+        return lvl[0]
+
+    root = merkle_root(leaf_hashes)
 
     vc = {
         "@context": ["https://www.w3.org/ns/credentials/v2"],
@@ -130,13 +189,10 @@ def issue_vc(did_name: str, firmware_version: str, device_model: str, firmware_b
         "id": f"vc:{did_name}:{firmware_version}",
         "issuer": f"did:local:{did_name}",
         "issuanceDate": datetime.utcnow().isoformat() + "Z",
-        "credentialSubject": {
-            "firmwareVersion": firmware_version,
-            "firmwareHash": firmware_hash,
-            "deviceModel": device_model
-        },
+        "credentialSubject": {},
+        "commitmentRoot": root,
         "firmwareCid": firmware_cid,
-        "contractAddress": CONTRACT_ADDRESS
+        "contractAddress": CONTRACT_ADDRESS,
     }
 
     message = json.dumps(vc, separators=(",", ":"), sort_keys=True).encode()
@@ -157,17 +213,22 @@ def issue_vc(did_name: str, firmware_version: str, device_model: str, firmware_b
     os.makedirs(vc_dir, exist_ok=True)
     with open(os.path.join(vc_dir, "firmware_vc.json"), "w") as f:
         json.dump(vc, f, indent=2)
+    # Persist salts and claims for proof generation
+    proof_data = {"claims": claims, "salts": salts}
+    with open(os.path.join(vc_dir, "salts.json"), "w") as f:
+        json.dump(proof_data, f, indent=2)
 
     try:
         cid = ipfs_upload(vc)
-    except RuntimeError as e:
-        return {"status": str(e), "vc": vc, "ipfs_cid": None}
+    except HTTPException as e:
+        return {"status": e.detail, "vc": vc, "ipfs_cid": None}
 
     return {
         "status": "✅ VC issued",
         "vc": vc,
         "ipfs_cid": cid,
         "firmware_cid": firmware_cid,
+        "proof_data": proof_data,
     }
 
 def verify_vc(vc: dict, contract):

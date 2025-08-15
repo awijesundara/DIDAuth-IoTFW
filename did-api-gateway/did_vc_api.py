@@ -107,6 +107,7 @@ def validate_firmware_version(version: str) -> str:
 
 class DIDRequest(BaseModel):
     name: str
+    secure_element: bool = False
 
 class VCCreateRequest(BaseModel):
     did_name: str
@@ -193,7 +194,8 @@ def create_did(req: DIDRequest):
             "id": f"did:local:{name}#key-1",
             "type": "Ed25519VerificationKey2020",
             "controller": f"did:local:{name}",
-            "publicKeyPem": open(f"{did_path}/public_key.pem").read()
+            "publicKeyPem": open(f"{did_path}/public_key.pem").read(),
+            "secureElement": req.secure_element,
         }]
     }
     with open(f"{did_path}/did.json", "w") as f:
@@ -313,9 +315,12 @@ def create_vp(req: VPCreateRequest, x_api_key: str = Header(...)):
                          
 
 @app.post("/vp/verify")
-async def verify_vp(request: Request):
+async def verify_vp(request: Request, require_secure_element: bool = False):
 
     vp_json = await request.json()
+    disclosures = vp_json.get("disclosures")
+    if disclosures is None and isinstance(vp_json.get("vp"), dict):
+        disclosures = vp_json["vp"].get("disclosures")
 
     if "verifiableCredential" in vp_json:
         vp = vp_json
@@ -340,17 +345,24 @@ async def verify_vp(request: Request):
                     raise HTTPException(status_code=400, detail=f"DID not found: {did_full}")
                 url = f"{IPFS_API_URL}/ipfs/{cid}"
                 async with httpx.AsyncClient() as client:
-                    resp = await client.get(url)
-                resp.raise_for_status()
+                    resp = await client.get(url, timeout=10)
+                    resp.raise_for_status()
                 did_doc = resp.json()
                 os.makedirs(os.path.dirname(did_path), exist_ok=True)
                 with open(did_path, "w") as f:
                     json.dump(did_doc, f, indent=2)
+            except httpx.HTTPError as e:
+                raise HTTPException(status_code=502, detail=f"Failed to fetch DID: {e}")
+            except HTTPException:
+                raise
             except Exception as e:
-                raise HTTPException(status_code=400, detail=f"Failed to fetch DID: {str(e)}")
+                raise HTTPException(status_code=502, detail=f"Failed to fetch DID: {e}")
         else:
             with open(did_path) as f:
                 did_doc = json.load(f)
+
+        if require_secure_element and not did_doc["verificationMethod"][0].get("secureElement"):
+            raise HTTPException(status_code=400, detail="Holder DID missing secure element")
 
         pubkey_pem = did_doc["verificationMethod"][0]["publicKeyPem"]
         public_key = serialization.load_pem_public_key(pubkey_pem.encode())
@@ -389,17 +401,24 @@ async def verify_vp(request: Request):
                 raise HTTPException(status_code=400, detail=f"DID not found: {did_full}")
             url = f"{IPFS_API_URL}/ipfs/{cid}"
             async with httpx.AsyncClient() as client:
-                resp = await client.get(url)
-            resp.raise_for_status()
+                resp = await client.get(url, timeout=10)
+                resp.raise_for_status()
             did_doc = resp.json()
             os.makedirs(os.path.dirname(did_path), exist_ok=True)
             with open(did_path, "w") as f:
                 json.dump(did_doc, f, indent=2)
+        except httpx.HTTPError as e:
+            raise HTTPException(status_code=502, detail=f"Failed to fetch DID: {e}")
+        except HTTPException:
+            raise
         except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Failed to fetch DID: {str(e)}")
+            raise HTTPException(status_code=502, detail=f"Failed to fetch DID: {e}")
     else:
         with open(did_path) as f:
             did_doc = json.load(f)
+
+    if require_secure_element and not did_doc["verificationMethod"][0].get("secureElement"):
+        raise HTTPException(status_code=400, detail="Issuer DID missing secure element")
 
     pubkey_pem = did_doc["verificationMethod"][0]["publicKeyPem"]
     public_key = serialization.load_pem_public_key(pubkey_pem.encode())
@@ -412,6 +431,30 @@ async def verify_vp(request: Request):
         valid = True
     except InvalidSignature:
         valid = False
+
+    disclosed_claims = {}
+    commitment_root = vc.get("commitmentRoot")
+    if commitment_root:
+        if not disclosures or not isinstance(disclosures, list):
+            raise HTTPException(status_code=400, detail="Missing disclosures")
+        for disc in disclosures:
+            claim = disc.get("claim")
+            salt = disc.get("salt")
+            proof = disc.get("merkleProof")
+            if not claim or not salt or not isinstance(proof, list):
+                raise HTTPException(status_code=400, detail="Invalid disclosure format")
+            if len(claim) != 1:
+                raise HTTPException(status_code=400, detail="Invalid claim in disclosure")
+            key, value = next(iter(claim.items()))
+            h = hashlib.sha256(f"{key}:{value}:{salt}".encode()).hexdigest()
+            for sib in proof:
+                a, b = sorted([h, sib])
+                h = hashlib.sha256((a + b).encode()).hexdigest()
+            if h != commitment_root:
+                raise HTTPException(status_code=400, detail=f"Invalid Merkle proof for {key}")
+            disclosed_claims[key] = value
+    elif disclosures:
+        raise HTTPException(status_code=400, detail="Disclosures provided but VC lacks commitmentRoot")
 
     chain_issuer = None
     if contract is not None:
@@ -437,16 +480,16 @@ async def verify_vp(request: Request):
 
     firmware_ok = False
     firmware_cid = vc.get("firmwareCid")
-    expected_hash = vc.get("credentialSubject", {}).get("firmwareHash")
+    expected_hash = disclosed_claims.get("firmwareHash")
     if firmware_cid and expected_hash:
         try:
             async with httpx.AsyncClient() as client:
-                resp = await client.get(f"{IPFS_API_URL}/ipfs/{firmware_cid}")
-            resp.raise_for_status()
+                resp = await client.get(f"{IPFS_API_URL}/ipfs/{firmware_cid}", timeout=10)
+                resp.raise_for_status()
             data = resp.content
             digest = hashlib.sha256(data).hexdigest()
             firmware_ok = digest == expected_hash
-        except Exception:
+        except httpx.HTTPError:
             firmware_ok = False
 
     status = (
@@ -472,11 +515,11 @@ async def verify_vp(request: Request):
 def verify_vc(req: VCVerifyRequest):
     cid = req.cid.strip()
     try:
-        response = requests.get(f"{IPFS_API_URL}/ipfs/{cid}")
+        response = requests.get(f"{IPFS_API_URL}/ipfs/{cid}", timeout=10)
         response.raise_for_status()
         vc = response.json()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"IPFS fetch error: {str(e)}")
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"IPFS fetch error: {e}")
 
     if "issuer" not in vc:
         raise HTTPException(status_code=400, detail="Missing issuer in VC")
@@ -499,7 +542,7 @@ def verify_vc(req: VCVerifyRequest):
                 if not cid_from_chain:
                     raise HTTPException(status_code=400, detail=f"DID not found: {did_full}")
                 url = f"{IPFS_API_URL}/ipfs/{cid_from_chain}"
-                did_response = requests.get(url)
+                did_response = requests.get(url, timeout=10)
                 did_response.raise_for_status()
                 did_doc = did_response.json()
                 os.makedirs(os.path.dirname(did_path), exist_ok=True)
@@ -507,8 +550,8 @@ def verify_vc(req: VCVerifyRequest):
                     json.dump(did_doc, f, indent=2)
             except HTTPException:
                 raise
-            except Exception as e:
-                raise HTTPException(status_code=400, detail=f"Failed to fetch DID: {str(e)}")
+            except requests.exceptions.RequestException as e:
+                raise HTTPException(status_code=502, detail=f"Failed to fetch DID: {e}")
 
     try:
         pubkey_pem = did_doc["verificationMethod"][0]["publicKeyPem"]

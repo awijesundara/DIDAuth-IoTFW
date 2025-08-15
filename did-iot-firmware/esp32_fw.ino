@@ -6,10 +6,18 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include "mbedtls/sha256.h"
+#include <vector>
 #define VERIFY_SIGNATURE 0
+#define USE_SECURE_ELEMENT 0  // Set to 1 when a secure element is present
 #if VERIFY_SIGNATURE
 #include <openssl/evp.h>
 #include <openssl/pem.h>
+#endif
+
+#if USE_SECURE_ELEMENT
+const char deviceDID[] PROGMEM = R"did({"@context":["https://www.w3.org/ns/did/v1"],"id":"did:local:esp32-device","verificationMethod":[{"id":"did:local:esp32-device#key-1","type":"Ed25519VerificationKey2020","controller":"did:local:esp32-device","publicKeyPem":"YOUR PUBLIC KEY HERE","secureElement":true}]})did";
+#else
+const char deviceDID[] PROGMEM = R"did({"@context":["https://www.w3.org/ns/did/v1"],"id":"did:local:esp32-device","verificationMethod":[{"id":"did:local:esp32-device#key-1","type":"Ed25519VerificationKey2020","controller":"did:local:esp32-device","publicKeyPem":"YOUR PUBLIC KEY HERE","secureElement":false}]})did";
 #endif
 
 const char* apSSID = "ESP32-VC-Uploader";
@@ -50,6 +58,15 @@ bool verifyFirmwareFile(const char* path, const char* expected) {
   bool ok = strcmp(hex, expected) == 0;
   Serial.println(ok ? "[FW] Hash match" : "[FW] Hash mismatch");
   return ok;
+}
+
+String sha256Hex(const String &data) {
+  uint8_t out[32];
+  mbedtls_sha256((const unsigned char*)data.c_str(), data.length(), out, 0);
+  char hex[65];
+  for (int i = 0; i < 32; ++i) sprintf(hex + i*2, "%02x", out[i]);
+  hex[64] = 0;
+  return String(hex);
 }
 
 #if VERIFY_SIGNATURE
@@ -248,7 +265,7 @@ void handleUpload(AsyncWebServerRequest *request, String filename, size_t index,
   }
 }
 
-void verifyVC() {
+void old_verifyVC() {
   File file = SPIFFS.open("/vc.json", FILE_READ);
   if (!file) {
     Serial.println("[ERROR] Failed to open VC file");
@@ -307,6 +324,120 @@ void verifyVC() {
       "\"verifiableCredential\": [" + vcOnly + "]"
     "}"
   "}";
+
+  Serial.println("[DEBUG] VP Payload:");
+  Serial.println(vpPayload);
+
+  HTTPClient http;
+  http.begin(verificationURL);
+  http.addHeader("Content-Type", "application/json");
+
+  int httpCode = http.POST(vpPayload);
+  Serial.printf("[VERIFY] HTTP Status: %d\n", httpCode);
+
+  if (httpCode > 0) {
+    String response = http.getString();
+    Serial.println("[VERIFY] Response: " + response);
+  } else {
+    Serial.println("[VERIFY] Error: " + http.errorToString(httpCode));
+  }
+
+  http.end();
+
+  verifyFirmwareFile(firmwareFile, fwHash);
+}
+
+void verifyVC() {
+  File file = SPIFFS.open("/vc.json", FILE_READ);
+  if (!file) {
+    Serial.println("[ERROR] Failed to open VC file");
+    return;
+  }
+
+  String raw = file.readString();
+  file.close();
+
+  DynamicJsonDocument doc(4096);
+  DeserializationError err = deserializeJson(doc, raw);
+  if (err) {
+    Serial.println("[ERROR] JSON parse failed");
+    return;
+  }
+
+  JsonObject vcObj = doc["vc"].as<JsonObject>();
+  if (vcObj.isNull()) {
+    Serial.println("[ERROR] 'vc' field not found");
+    return;
+  }
+  String vcOnly;
+  serializeJson(vcObj, vcOnly);
+
+  JsonObject claims = doc["proof_data"]["claims"].as<JsonObject>();
+  JsonObject salts = doc["proof_data"]["salts"].as<JsonObject>();
+  const char* fwHash = claims["firmwareHash"] | "";
+  const char* fwSalt = salts["firmwareHash"] | "";
+  const char* fwVer = claims["firmwareVersion"] | "";
+  const char* fwVerSalt = salts["firmwareVersion"] | "";
+  const char* devModel = claims["deviceModel"] | "";
+  const char* devSalt = salts["deviceModel"] | "";
+
+#if VERIFY_SIGNATURE
+  DynamicJsonDocument vcDoc(2048);
+  DeserializationError err2 = deserializeJson(vcDoc, vcOnly);
+  if (!err2 && verifySignature(vcDoc)) {
+    Serial.println("[SIG] Signature valid");
+  } else {
+    Serial.println("[SIG] Signature invalid");
+  }
+#endif
+
+  String keys[3] = {"deviceModel", "firmwareHash", "firmwareVersion"};
+  String values[3] = {devModel, fwHash, fwVer};
+  String saltArr[3] = {devSalt, fwSalt, fwVerSalt};
+  String leaves[3];
+  for (int i = 0; i < 3; ++i) {
+    leaves[i] = sha256Hex(keys[i] + ":" + values[i] + ":" + saltArr[i]);
+  }
+  std::vector<String> level;
+  for (int i = 0; i < 3; ++i) level.push_back(leaves[i]);
+  std::vector<String> proof;
+  int idx = 1; // firmwareHash index
+  while (level.size() > 1) {
+    if (level.size() % 2 == 1) level.push_back(level.back());
+    std::vector<String> next;
+    for (size_t i = 0; i < level.size(); i += 2) {
+      String a = level[i];
+      String b = level[i + 1];
+      if (i == idx || i + 1 == idx) {
+        String sibling = (i == idx) ? b : a;
+        proof.push_back(sibling);
+        idx = next.size();
+      }
+      String combined = (a < b) ? a + b : b + a;
+      next.push_back(sha256Hex(combined));
+    }
+    level = next;
+  }
+
+  DynamicJsonDocument vpDoc(2048);
+  JsonObject vp = vpDoc.createNestedObject("vp");
+  JsonArray ctx = vp.createNestedArray("@context");
+  ctx.add("https://www.w3.org/ns/credentials/v2");
+  JsonArray typ = vp.createNestedArray("type");
+  typ.add("VerifiablePresentation");
+  vp["holder"] = "did:local:esp32-device";
+  JsonArray vcArr = vp.createNestedArray("verifiableCredential");
+  vcArr.add(vcObj);
+  JsonArray discArr = vpDoc.createNestedArray("disclosures");
+  JsonObject d = discArr.createNestedObject();
+  JsonObject claimObj = d.createNestedObject("claim");
+  claimObj["firmwareHash"] = fwHash;
+  d["salt"] = fwSalt;
+  JsonArray proofArr = d.createNestedArray("merkleProof");
+  for (String &p : proof) proofArr.add(p);
+
+  String vpPayload;
+  serializeJson(vpDoc, vpPayload);
 
   Serial.println("[DEBUG] VP Payload:");
   Serial.println(vpPayload);

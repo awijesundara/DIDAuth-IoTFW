@@ -83,6 +83,7 @@ os.makedirs(DATA_DIR, exist_ok=True)
 class DIDRequest(BaseModel):
     name: str
     metadata: str = ""
+    secure_element: bool = False
 
 class VCRequest(BaseModel):
     did_name: str
@@ -113,7 +114,8 @@ def register_did(req: DIDRequest):
             "id": f"{did}#key-1",
             "type": "Ed25519VerificationKey2020",
             "controller": did,
-            "publicKeyPem": pubkey_pem
+            "publicKeyPem": pubkey_pem,
+            "secureElement": req.secure_element,
         }],
         "authentication": [f"{did}#key-1"]
     }
@@ -126,10 +128,12 @@ def register_did(req: DIDRequest):
 
                     
     did_path = os.path.join(vendor_dir, f"{req.name}_did.json")
-    with open(did_path, "rb") as f:
-        res = requests.post(f"{IPFS_API_URL}/add", files={"file": f})
-    if res.status_code != 200:
-        raise HTTPException(status_code=500, detail="Failed to upload DID to IPFS")
+    try:
+        with open(did_path, "rb") as f:
+            res = requests.post(f"{IPFS_API_URL}/add", files={"file": f}, timeout=10)
+        res.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"Failed to upload DID to IPFS: {e}")
     cid = res.json()["Hash"]
 
                        
@@ -166,10 +170,16 @@ def did_create(req: DIDRequest):
 def resolve_did(did_name: str):
     did = f"did:local:{did_name}"
     cid = contract.functions.getDIDCID(did).call()
-    response = requests.post(f"{IPFS_API_URL}/cat?arg={cid}")
-    if response.status_code == 200:
-        return json.loads(response.content)
-    raise HTTPException(status_code=404, detail="DID not found")
+    try:
+        response = requests.post(f"{IPFS_API_URL}/cat?arg={cid}", timeout=10)
+        response.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        if e.response is not None and e.response.status_code == 404:
+            raise HTTPException(status_code=404, detail="DID not found")
+        raise HTTPException(status_code=502, detail=f"IPFS request failed: {e}")
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"IPFS request failed: {e}")
+    return json.loads(response.content)
 
 @app.post("/vc/issue")
 def vc_issue(req: VCRequest, x_api_key: str = Header(...)):
