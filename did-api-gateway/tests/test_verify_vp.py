@@ -3,6 +3,7 @@ import json
 import asyncio
 import importlib.util
 from pathlib import Path
+import pytest
 
 spec = importlib.util.spec_from_file_location(
     "did_vc_api", Path(__file__).resolve().parents[1] / "did_vc_api.py"
@@ -58,3 +59,20 @@ def test_verify_vp_bad_firmware_hash(tmp_path, monkeypatch):
     req = DummyRequest(vp)
     result = asyncio.run(did_vc_api.verify_vp(req))
     assert result["firmware_hash_match"] is False
+
+
+def test_verify_vp_requires_secure_element(tmp_path, monkeypatch):
+    _setup_did(tmp_path)
+    monkeypatch.setattr(did_vc_api.serialization, "load_pem_public_key", lambda *_: StubKey())
+    monkeypatch.setattr(did_vc_api, "contract", None)
+
+    vc = {
+        "id": "vc:test:1",
+        "issuer": "did:local:test",
+        "credentialSubject": {},
+        "proof": {"jws": base64.urlsafe_b64encode(b"sig").decode(), "verificationMethod": {"publicKeyPem": "pem"}},
+    }
+    vp = {"verifiableCredential": [vc]}
+    req = DummyRequest(vp)
+    with pytest.raises(did_vc_api.HTTPException):
+        asyncio.run(did_vc_api.verify_vp(req, require_secure_element=True))
