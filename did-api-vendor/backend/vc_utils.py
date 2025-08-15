@@ -115,23 +115,29 @@ def verify_api_key(did_name: str, api_key: str):
 def ipfs_upload(json_obj):
     json_str = json.dumps(json_obj)
     files = {'file': ('vc.json', json_str)}
-    res = requests.post(f"{IPFS_API_URL}/add", files=files)
-    if res.status_code != 200:
-        raise RuntimeError(f"IPFS upload failed: {res.text}")
+    try:
+        res = requests.post(f"{IPFS_API_URL}/add", files=files, timeout=10)
+        res.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"IPFS upload failed: {e}")
     return res.json().get("Hash")
 
 
 def ipfs_upload_bytes(data: bytes) -> str:
     files = {"file": ("firmware.bin", data)}
-    res = requests.post(f"{IPFS_API_URL}/add", files=files)
-    if res.status_code != 200:
-        raise RuntimeError(f"IPFS upload failed: {res.text}")
+    try:
+        res = requests.post(f"{IPFS_API_URL}/add", files=files, timeout=10)
+        res.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"IPFS upload failed: {e}")
     return res.json().get("Hash")
 
 def ipfs_download(cid: str):
-    res = requests.post(f"{IPFS_API_URL}/cat?arg={cid}")
-    if res.status_code != 200:
-        raise RuntimeError(f"IPFS download failed: {res.text}")
+    try:
+        res = requests.post(f"{IPFS_API_URL}/cat?arg={cid}", timeout=10)
+        res.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"IPFS download failed: {e}")
     return json.loads(res.content)
 
 def issue_vc(did_name: str, firmware_version: str, device_model: str, firmware_b64: str):
@@ -142,10 +148,7 @@ def issue_vc(did_name: str, firmware_version: str, device_model: str, firmware_b
         raise HTTPException(status_code=400, detail="Invalid base64 data")
     firmware_hash = hashlib.sha256(firmware_bytes).hexdigest()
 
-    try:
-        firmware_cid = ipfs_upload_bytes(firmware_bytes)
-    except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    firmware_cid = ipfs_upload_bytes(firmware_bytes)
 
     private_key, pubkey_pem = load_or_create_keys(did_name)
 
@@ -217,8 +220,8 @@ def issue_vc(did_name: str, firmware_version: str, device_model: str, firmware_b
 
     try:
         cid = ipfs_upload(vc)
-    except RuntimeError as e:
-        return {"status": str(e), "vc": vc, "ipfs_cid": None}
+    except HTTPException as e:
+        return {"status": e.detail, "vc": vc, "ipfs_cid": None}
 
     return {
         "status": "✅ VC issued",
