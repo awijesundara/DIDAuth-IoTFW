@@ -36,6 +36,12 @@ docker build -t did-vendor .
 docker run --env-file .env -p 8000:8000 did-vendor
 ```
 
+## Security
+
+Private/public key pairs and API keys are stored under `data/`. On startup the
+server restricts these files to user-only access (`chmod 600`) to prevent other
+system users from reading or modifying sensitive credentials.
+
 ## Logging
 
 Requests and errors are written to `/var/log/did-auth.log` by default. Set the
