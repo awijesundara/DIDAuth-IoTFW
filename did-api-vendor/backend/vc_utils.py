@@ -26,6 +26,20 @@ IPFS_API_URL = os.getenv("IPFS_API_URL", "http://127.0.0.1:5001/api/v0")
 
 fernet = Fernet(FERNET_SECRET)
 
+
+def enforce_permissions():
+    """Restrict sensitive files to user-only access on startup."""
+    for root, _, files in os.walk(DATA_DIR):
+        for name in files:
+            if name in {"private_key.pem", "public_key.pem", "apikey.key"}:
+                try:
+                    os.chmod(os.path.join(root, name), 0o600)
+                except OSError:
+                    pass
+
+
+enforce_permissions()
+
 def sanitize_name(name: str) -> str:
     if not re.match(r"^[A-Za-z0-9_-]+$", name):
         raise HTTPException(status_code=400, detail="Invalid name")
@@ -56,6 +70,12 @@ def load_or_create_keys(did_name: str):
     else:
         with open(priv_path, "rb") as f:
             private_key = serialization.load_pem_private_key(f.read(), password=None)
+    # enforce owner-only permissions (0o600) for key files
+    for path in (priv_path, pub_path):
+        try:
+            os.chmod(path, 0o600)
+        except OSError:
+            pass
 
     with open(pub_path, "r") as f:
         pubkey_pem = f.read()
@@ -71,6 +91,11 @@ def save_api_key(did_name: str):
     os.makedirs(os.path.dirname(apikey_path), exist_ok=True)
     with open(apikey_path, "w") as f:
         f.write(encrypted)
+
+    try:
+        os.chmod(apikey_path, 0o600)
+    except OSError:
+        pass  # best effort to lock down API key file
 
     return api_key
 
