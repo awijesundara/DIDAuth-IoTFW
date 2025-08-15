@@ -83,6 +83,7 @@ os.makedirs(DATA_DIR, exist_ok=True)
 class DIDRequest(BaseModel):
     name: str
     metadata: str = ""
+    secure_element: bool = False
 
 class VCRequest(BaseModel):
     did_name: str
@@ -113,7 +114,8 @@ def register_did(req: DIDRequest):
             "id": f"{did}#key-1",
             "type": "Ed25519VerificationKey2020",
             "controller": did,
-            "publicKeyPem": pubkey_pem
+            "publicKeyPem": pubkey_pem,
+            "secureElement": req.secure_element,
         }],
         "authentication": [f"{did}#key-1"]
     }

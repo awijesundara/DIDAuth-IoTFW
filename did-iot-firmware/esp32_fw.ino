@@ -8,9 +8,16 @@
 #include "mbedtls/sha256.h"
 #include <vector>
 #define VERIFY_SIGNATURE 0
+#define USE_SECURE_ELEMENT 0  // Set to 1 when a secure element is present
 #if VERIFY_SIGNATURE
 #include <openssl/evp.h>
 #include <openssl/pem.h>
+#endif
+
+#if USE_SECURE_ELEMENT
+const char deviceDID[] PROGMEM = R"did({"@context":["https://www.w3.org/ns/did/v1"],"id":"did:local:esp32-device","verificationMethod":[{"id":"did:local:esp32-device#key-1","type":"Ed25519VerificationKey2020","controller":"did:local:esp32-device","publicKeyPem":"YOUR PUBLIC KEY HERE","secureElement":true}]})did";
+#else
+const char deviceDID[] PROGMEM = R"did({"@context":["https://www.w3.org/ns/did/v1"],"id":"did:local:esp32-device","verificationMethod":[{"id":"did:local:esp32-device#key-1","type":"Ed25519VerificationKey2020","controller":"did:local:esp32-device","publicKeyPem":"YOUR PUBLIC KEY HERE","secureElement":false}]})did";
 #endif
 
 const char* apSSID = "ESP32-VC-Uploader";

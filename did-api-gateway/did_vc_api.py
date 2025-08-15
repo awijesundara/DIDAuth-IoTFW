@@ -107,6 +107,7 @@ def validate_firmware_version(version: str) -> str:
 
 class DIDRequest(BaseModel):
     name: str
+    secure_element: bool = False
 
 class VCCreateRequest(BaseModel):
     did_name: str
@@ -193,7 +194,8 @@ def create_did(req: DIDRequest):
             "id": f"did:local:{name}#key-1",
             "type": "Ed25519VerificationKey2020",
             "controller": f"did:local:{name}",
-            "publicKeyPem": open(f"{did_path}/public_key.pem").read()
+            "publicKeyPem": open(f"{did_path}/public_key.pem").read(),
+            "secureElement": req.secure_element,
         }]
     }
     with open(f"{did_path}/did.json", "w") as f:
@@ -313,7 +315,7 @@ def create_vp(req: VPCreateRequest, x_api_key: str = Header(...)):
                          
 
 @app.post("/vp/verify")
-async def verify_vp(request: Request):
+async def verify_vp(request: Request, require_secure_element: bool = False):
 
     vp_json = await request.json()
     disclosures = vp_json.get("disclosures")
@@ -354,6 +356,9 @@ async def verify_vp(request: Request):
         else:
             with open(did_path) as f:
                 did_doc = json.load(f)
+
+        if require_secure_element and not did_doc["verificationMethod"][0].get("secureElement"):
+            raise HTTPException(status_code=400, detail="Holder DID missing secure element")
 
         pubkey_pem = did_doc["verificationMethod"][0]["publicKeyPem"]
         public_key = serialization.load_pem_public_key(pubkey_pem.encode())
@@ -403,6 +408,9 @@ async def verify_vp(request: Request):
     else:
         with open(did_path) as f:
             did_doc = json.load(f)
+
+    if require_secure_element and not did_doc["verificationMethod"][0].get("secureElement"):
+        raise HTTPException(status_code=400, detail="Issuer DID missing secure element")
 
     pubkey_pem = did_doc["verificationMethod"][0]["publicKeyPem"]
     public_key = serialization.load_pem_public_key(pubkey_pem.encode())
