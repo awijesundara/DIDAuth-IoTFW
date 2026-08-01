@@ -249,6 +249,28 @@ def vp_create(req: VPCreateRequest, x_api_key: str = Header(...)):
 
     return {"status": "✅ VP created", "vp": vp}
 
+def resolve_registered_pubkey(issuer_did: str):
+    """Look up the public key actually registered on-chain/IPFS for a DID.
+
+    Used so VC/VP signature checks trust the issuer's registered DID document
+    instead of whatever public key happens to be embedded in the proof being
+    verified (which is attacker-controlled input).
+    """
+    try:
+        name = sanitize_name(issuer_did.split(":")[-1])
+    except HTTPException:
+        return None
+    try:
+        cid = contract.functions.getDIDCID(f"did:local:{name}").call()
+        if not cid:
+            return None
+        did_doc = ipfs_download(cid)
+        return did_doc["verificationMethod"][0]["publicKeyPem"]
+    except Exception as e:
+        logger.error(f"DID resolution error for {issuer_did}: {e}")
+        return None
+
+
 @app.post("/vc/verify")
 async def vc_verify(request: Request):
     try:
@@ -257,7 +279,7 @@ async def vc_verify(request: Request):
             vc = ipfs_download(data["cid"])
         else:
             vc = data
-        return verify_vc(vc, contract)
+        return verify_vc(vc, contract, resolve_pubkey=resolve_registered_pubkey)
     except Exception as e:
         logger.error(f"VC Verify error: {e}")
         raise HTTPException(status_code=400, detail=f"Failed to fetch DID: {e}")
@@ -286,7 +308,7 @@ async def vp_verify(request: Request):
         except InvalidSignature:
             vp_valid = False
 
-    result = verify_vc(vc, contract)
+    result = verify_vc(vc, contract, resolve_pubkey=resolve_registered_pubkey)
     result["vp_signature_valid"] = vp_valid
     if vp_valid is False:
         result["valid"] = False

@@ -24,7 +24,7 @@ install_service() {
     local template="$ROOT_DIR/systemd/$name.service"
     local dest="/etc/systemd/system/$name.service"
 
-    echo "\nInstalling $name.service to $dest"
+    printf '\nInstalling %s.service to %s\n' "$name" "$dest"
     sudo sed -e "s|{{WORKING_DIR}}|$dir|g" -e "s|{{USER}}|$USER_NAME|g" \
         "$template" | sudo tee "$dest" >/dev/null
     sudo systemctl daemon-reload

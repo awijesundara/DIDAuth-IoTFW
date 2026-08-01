@@ -14,5 +14,21 @@ RestartSec=5
 StandardOutput=journal
 StandardError=journal
 
+; Hardening: this service holds Ed25519 private keys and API-key secrets
+; on disk, so lock it down beyond the default systemd sandbox.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths={{WORKING_DIR}}/data {{WORKING_DIR}}/logs
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+UMask=0077
+
 [Install]
 WantedBy=multi-user.target

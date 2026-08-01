@@ -231,7 +231,18 @@ def issue_vc(did_name: str, firmware_version: str, device_model: str, firmware_b
         "proof_data": proof_data,
     }
 
-def verify_vc(vc: dict, contract):
+def verify_vc(vc: dict, contract, resolve_pubkey=None):
+    """Verify a VC's proof.
+
+    ``resolve_pubkey``, if given, is a callable ``issuer_did -> pem_str | None``
+    that looks up the *registered* public key for the issuer DID (e.g. via the
+    on-chain DID registry / IPFS-hosted DID document). When provided, the key
+    embedded in the VC's own ``proof.verificationMethod`` is only used to
+    identify which key to expect — it is not trusted on its own. Without a
+    resolver, the proof-embedded key is trusted directly, which allows anyone
+    to forge a VC by signing with a keypair of their own choosing and is only
+    safe for tests / local trust-on-first-use setups.
+    """
     vc_data = vc.copy()
     proof = vc_data.pop("proof")
     vc_id = vc_data.get("id")
@@ -252,10 +263,23 @@ def verify_vc(vc: dict, contract):
             "revoked": None
         }
 
+    embedded_pubkey_pem = proof["verificationMethod"]["publicKeyPem"]
+    if resolve_pubkey is not None:
+        trusted_pubkey_pem = resolve_pubkey(issuer)
+        if not trusted_pubkey_pem or trusted_pubkey_pem.strip() != embedded_pubkey_pem.strip():
+            return {
+                "valid": False,
+                "issuer": issuer,
+                "revoked": None,
+                "status": "❌ Proof key does not match issuer's registered DID document",
+            }
+        pubkey_pem = trusted_pubkey_pem
+    else:
+        pubkey_pem = embedded_pubkey_pem
+
     message = json.dumps(vc_data, separators=(",", ":"), sort_keys=True).encode()
     signature = base64.urlsafe_b64decode(proof["jws"] + "==")
 
-    pubkey_pem = proof["verificationMethod"]["publicKeyPem"]
     public_key = serialization.load_pem_public_key(pubkey_pem.encode())
 
     try:

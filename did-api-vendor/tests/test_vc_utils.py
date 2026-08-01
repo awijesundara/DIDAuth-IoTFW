@@ -1,6 +1,6 @@
 import importlib.util
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 import base64
 import os
 import requests
@@ -57,6 +57,67 @@ def test_revoke_vc_sends_transaction():
 
     assert tx == "0xhash"
     mock_w3.eth.send_raw_transaction.assert_called_once_with(signed.raw_transaction)
+
+
+def _stub_key():
+    mock_key = MagicMock()
+    mock_key.verify.return_value = None
+    return mock_key
+
+
+def test_verify_vc_rejects_key_not_in_registered_did_document():
+    """A VC signed with an attacker-chosen keypair must not verify just
+    because the attacker also embeds their own public key in the proof.
+    verify_vc must cross-check against the issuer's registered DID document
+    when a resolver is supplied."""
+    vc = {
+        "id": "vc:test:1",
+        "issuer": "did:local:test",
+        "contractAddress": "0x0000000000000000000000000000000000000000",
+        "proof": {
+            "jws": "AAA",
+            "verificationMethod": {"publicKeyPem": "ATTACKER_KEY"},
+        },
+    }
+
+    class DummyContract:
+        address = "0x0000000000000000000000000000000000000000"
+
+    def resolve_pubkey(issuer_did):
+        assert issuer_did == "did:local:test"
+        return "REGISTERED_KEY"
+
+    result = vc_utils.verify_vc(vc, DummyContract(), resolve_pubkey=resolve_pubkey)
+    assert result["valid"] is False
+    assert "does not match" in result["status"]
+
+
+def test_verify_vc_accepts_matching_registered_key():
+    vc = {
+        "id": "vc:test:1",
+        "issuer": "did:local:test",
+        "contractAddress": "0x0000000000000000000000000000000000000000",
+        "proof": {
+            "jws": "AAA",
+            "verificationMethod": {"publicKeyPem": "REGISTERED_KEY"},
+        },
+    }
+
+    class DummyContract:
+        address = "0x0000000000000000000000000000000000000000"
+        class functions:
+            @staticmethod
+            def isVCRevoked(_):
+                class Func:
+                    def call(self):
+                        return False
+                return Func()
+
+    with patch("vc_utils.serialization.load_pem_public_key", return_value=_stub_key()):
+        result = vc_utils.verify_vc(
+            vc, DummyContract(), resolve_pubkey=lambda issuer_did: "REGISTERED_KEY"
+        )
+    assert result["valid"] is True
 
 
 def test_issue_vc_uploads_firmware_and_embeds_cid(monkeypatch):
