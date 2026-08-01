@@ -31,3 +31,4 @@ blockchain/*.tsbuildinfo
 Thumbs.db
 performance-analysis/latency_graphs/
 security-analysis/security_graphs/
+did-iot-firmware/.pio/
