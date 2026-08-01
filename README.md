@@ -4,7 +4,7 @@ DIDAuth-IoTFW explores decentralized firmware verification for IoT devices. The 
 
 - **did-api-vendor** – issues firmware credentials
 - **did-api-gateway** – verifies credentials
-- **did-iot-firmware** – ESP32 example
+- **did-iot-firmware** – ESP32 example (PlatformIO project, see its [README](did-iot-firmware/README.md) for build/flash instructions and an architecture diagram)
 - **performance-analysis** – latency scripts
 - **security-analysis** – security tests (includes `run_threat_model_tests.sh`)
 
