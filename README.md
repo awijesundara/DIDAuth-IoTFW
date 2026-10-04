@@ -1,9 +1,5 @@
 # DIDAuth-IoTFW
 
-[![Paper](https://img.shields.io/badge/DOI-10.1016%2Fj.iot.2025.101788-blue)](https://doi.org/10.1016/j.iot.2025.101788)
-[![Journal](https://img.shields.io/badge/Internet%20of%20Things-Vol.%2034%2C%202025-003E4C)](https://www.sciencedirect.com/science/article/pii/S2542660525003026)
-[![License: MIT](https://img.shields.io/badge/License-MIT-lightgrey)](LICENSE)
-
 **DIDAuth-IoTFW** is a decentralized identity and firmware-authentication
 framework for smart-home IoT devices. It replaces a centralized,
 single-point-of-failure firmware pipeline with W3C Decentralized Identifiers
@@ -13,6 +9,25 @@ A firmware image's hash is bound directly into its credential, and every
 device verifies that credential — and its own firmware's hash against it —
 **on-device**, so a compromised or unreachable gateway can never trick a
 device into accepting the wrong firmware.
+
+[![CI](https://github.com/awijesundara/DIDAuth-IoTFW/actions/workflows/ci.yml/badge.svg)](https://github.com/awijesundara/DIDAuth-IoTFW/actions/workflows/ci.yml)
+[![Last commit](https://img.shields.io/github/last-commit/awijesundara/DIDAuth-IoTFW/main)](https://github.com/awijesundara/DIDAuth-IoTFW/commits/main)
+[![Top language](https://img.shields.io/github/languages/top/awijesundara/DIDAuth-IoTFW)](https://github.com/awijesundara/DIDAuth-IoTFW)
+[![Code size](https://img.shields.io/github/languages/code-size/awijesundara/DIDAuth-IoTFW)](https://github.com/awijesundara/DIDAuth-IoTFW)
+[![License](https://img.shields.io/github/license/awijesundara/DIDAuth-IoTFW)](LICENSE)
+[![Paper](https://img.shields.io/badge/DOI-10.1016%2Fj.iot.2025.101788-blue)](https://doi.org/10.1016/j.iot.2025.101788)
+[![Journal](https://img.shields.io/badge/Internet%20of%20Things-Vol.%2034%2C%202025-003E4C)](https://www.sciencedirect.com/science/article/pii/S2542660525003026)
+[![python](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)](did-api-gateway/requirements.txt)
+[![FastAPI](https://img.shields.io/badge/FastAPI-vendor%20%2B%20gateway-009688?logo=fastapi&logoColor=white)](did-api-vendor)
+[![ESP32](https://img.shields.io/badge/ESP32-firmware-E7352C?logo=espressif&logoColor=white)](did-iot-firmware)
+[![Arbitrum](https://img.shields.io/badge/Arbitrum-L2%20registry-28A0F0)](did-api-vendor/blockchain)
+
+<table>
+<tr>
+<td width="50%"><img src="performance-analysis/Results/latency_boxplot_by_payload.png" alt="Credential operation latency by payload"><br><sub>Credential operation latency by payload</sub></td>
+<td width="50%"><img src="performance-analysis/Results/esp32_total_verification_time_vs_attempt.png" alt="ESP32 end-to-end verification time"><br><sub>ESP32 end-to-end verification time</sub></td>
+</tr>
+</table>
 
 This repository is the reference implementation and proof-of-concept behind
 the peer-reviewed paper below: two FastAPI backends (issuer and verifier), an
@@ -146,3 +161,15 @@ Communication systems · IPFS
 
 MIT License
 © 2025 Anushka Wijesundara
+
+## Project statistics
+
+| Metric | Value |
+|---|---|
+| Tracked files | 77 |
+| Lines of code (non-blank) | 2,807 |
+| Languages | Python 1,742, C++ (Arduino) 639, Shell 357, Solidity 45, JavaScript 24 |
+| Automated tests | 9 |
+| Commits | 10 |
+
+CI compiles both FastAPI services and runs the gateway and vendor test suites on each push to `main`.
