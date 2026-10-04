@@ -102,6 +102,7 @@ flowchart LR
 | [`did-iot-firmware`](did-iot-firmware) | ESP32 proof-of-concept — on-device VC/VP verification (see its [README](did-iot-firmware/README.md) for build/flash instructions and a device-level architecture diagram) |
 | [`performance-analysis`](performance-analysis) | Latency/throughput measurement scripts and results |
 | [`security-analysis`](security-analysis) | Threat-model and security tests (`run_threat_model_tests.sh`) |
+| [`esp32-analyisis`](esp32-analyisis) | ESP32 on-device evaluation results (`esp32_eval_results.csv`) |
 
 ## Publication
 
